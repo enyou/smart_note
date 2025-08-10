@@ -1,0 +1,14 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.41
+asyncpg==0.30.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+pydantic-settings==2.0.3
+python-dotenv==1.0.0
+email-validator==2.1.0.post1
+langchain == 0.3.0
+langchain-core==0.3.63
+langchain-openai==0.2.0
+
