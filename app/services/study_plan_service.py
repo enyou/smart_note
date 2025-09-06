@@ -1,8 +1,9 @@
 import json
-from typing import List, Optional, AsyncGenerator
+import re
+from typing import Any, Dict, List, Optional, AsyncGenerator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.study_plan import  StudyPlanCreate
+from app.models.study_plan import StudyPlanCreate
 from app.models.db_models import Note, StudyPlan
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from app.llm.ai_service import ai_service
 from app.tools.mk_2_json import markdown_to_json
+from app.llm.prompts import extract_info_prompt
 
 
 class AIStudyRequest(BaseModel):
@@ -52,16 +54,18 @@ class StudyPlanService:
             在输出时，请按照以下格式提供学习计划,其他无关内容不要输出：
             
             ### 学习主题: 学习的主题
+            ### 学习天数: 计划天数
+            ### 学习目标: 具体学习目标
             ### 学习计划描述:
                 总体学习概述
             ### 学习计划大纲
             **第n天(n从1开始)**
             * 学习内容:当天主要学习主题 
             * 学习知识点:
-            1 关键知识点1
-            2 关键知识点2
-            3 关键知识点3
-            4 ......
+            1. 关键知识点1
+            2. 关键知识点2
+            3. 关键知识点3
+            4. ......
   
         """
         return user_prompt
@@ -94,28 +98,29 @@ class StudyPlanService:
         self,
         db: AsyncSession,
         ai_response: str,
-        request: AIStudyRequest
     ) -> StudyPlan:
         """从AI响应创建学习计划"""
         try:
-            data = json.loads(ai_response)
-
+            ai_json_output = markdown_to_json(ai_response)
+            data = json.loads(ai_json_output)
             # 计算时间范围
+            total_days = data["total_days"]
+            if re.match("\d+天",data["total_days"]):
+                total_days =  int(data["total_days"].replace("天","").strip())
             start_time = datetime.now()
-            end_time = start_time + timedelta(days=request.total_days)
+            end_time = start_time + timedelta(days=total_days)
 
             # 创建主学习计划
             study_plan = StudyPlan(
                 title=data["title"],
                 content=data["content"],
-                goal=request.specific_goals,
-                total_days=request.total_days,
+                goal=data["specific_goals"],
+                total_days=total_days,
                 start_time=start_time,
                 end_time=end_time,
-                user_id=request.user_id
+                user_id=1
             )
 
-            
             db.add(study_plan)
             await db.flush()
 
@@ -135,12 +140,9 @@ class StudyPlanService:
                     is_completed=False
                 )
                 db.add(note_create)
-            
 
             return study_plan
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())
             raise HTTPException(
                 status_code=400, detail=f"Error parsing AI response: {str(e)}")
 
@@ -171,6 +173,13 @@ class StudyPlanService:
         stm = select(StudyPlan).where(StudyPlan.id == plan_id)
         result = await db.execute(stm)
         return result.scalars().one_or_none()
+
+    async def get_import_infor(self, msg: str) -> Dict[str, Any]:
+        system_prompt = extract_info_prompt.ExtractInfoPrompt.SYS_PROMPT
+        user_prompt = extract_info_prompt.ExtractInfoPrompt.USER_PROMPT.format(
+            user_input=msg)
+        respon = await ai_service.generate_response(system_prompt, user_prompt)
+        return json.loads(respon.content)
 
 
 # Global instance

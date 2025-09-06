@@ -45,4 +45,3 @@ agent = initialize_agent(
 if __name__ == "__main__":
     # user_input = input("请输入你的问题或学习需求：")
     result = agent.run("我想要学习java")
-    print(result)

@@ -5,7 +5,7 @@ from typing import List
 import json
 
 from app.db.session import get_session
-from app.models.study_plan import StudyPlanCreate, StudyPlanResponse
+from app.models.study_plan import GenStudyPlanBase, StudyPlanAiResp, StudyPlanResponse
 from app.services.study_plan_service import study_plan_service, AIStudyRequest
 
 router = APIRouter()
@@ -28,13 +28,18 @@ async def get_study_plan(plan_id: int, db: AsyncSession = Depends(get_session)):
 
 @router.post("/generate-stream")
 async def generate_study_plan_stream(
-    request: AIStudyRequest
+    plan_needs: GenStudyPlanBase
 ):
     """使用AI生成学习计划（流式返回）"""
+    # 信息提取
+    info = await study_plan_service.get_import_infor(plan_needs.msg)
+    info["user_id"] = 1
+    request = AIStudyRequest.model_validate(info)
+
     async def generate():
         try:
             async for chunk in study_plan_service.generate_study_plan_stream(request):
-                yield f"data: {json.dumps({'content': chunk})}\n\n"
+                yield chunk
         except Exception as e:
             import traceback
             yield f"data: {json.dumps({'error': traceback.format_exc()})}\n\n"
@@ -60,3 +65,12 @@ async def gen_study_plan(
 ):
     """使用AI生成学习计划(非流式返回)"""
     return await study_plan_service.generate_study_plan(request)
+
+
+@router.post("/save_plan", response_model=StudyPlanResponse)
+async def save_plan(
+    ai_response: StudyPlanAiResp,
+    db: AsyncSession = Depends(get_session)
+):
+    """在页面中新建学习计划对应的API"""
+    return await study_plan_service.create_study_plan_from_ai_response(db, ai_response.ai_response)

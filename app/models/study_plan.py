@@ -24,6 +24,10 @@ class StudyPlanBase(BaseModel):
     start_time: datetime
     end_time: datetime
 
+# Pydantic Models
+class GenStudyPlanBase(BaseModel):
+    msg: str
+    user_id: str
 
 class StudyPlanCreate(StudyPlanBase):
     pass
@@ -45,3 +49,7 @@ class StudyPlanResponse(StudyPlanInDB):
 class StudyPlanTitle(BaseModel):
     id: int
     title: str
+
+# Pydantic Models
+class StudyPlanAiResp(BaseModel):
+    ai_response: str

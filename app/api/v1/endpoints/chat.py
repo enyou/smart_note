@@ -23,7 +23,6 @@ router = APIRouter()
 @router.post("/chat")
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_session)):
     """与AI助手对话"""
-    print(request.model_dump())
     session_id = "{}_{}".format(request.user_id, request.note_id)
     return StreamingResponse(chat_service.generate_stream_by_langchain(db, user_msg=request.user_msg,session_id=session_id), media_type="text/event-stream")
     # return await chat_service.chat_response(db=db, user_msg=request.user_msg)

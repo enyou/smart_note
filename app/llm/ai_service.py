@@ -39,7 +39,6 @@ class AIService:
                 temperature=0.7,
                 stream=False
             )
-
             content = response.choices[0].message.content
             return AIResponse(
                 content=content
@@ -51,6 +50,8 @@ class AIService:
                 detail=ErrorMessages.LLM_CONN_TIMEOUT
             )
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             raise HTTPException(
                 status_code=500,
                 detail=f"{ErrorMessages.LLM_CALLING_ERROR}: {str(e)}"

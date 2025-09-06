@@ -68,7 +68,6 @@ class UserService:
 
     async def authenticate_user(self, db: AsyncSession, username: str, password: str) -> Optional[User]:
         user = await self.get_user_by_username(db, username)
-        print(user.__dict__)
         if not user:
             return None
         if not self.verify_password(password, user.hashed_password):
