@@ -12,7 +12,7 @@ source smart_env/bin/activate  # On Windows use: venv\Scripts\activate
 
 2. Install dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 ```
 
 3. Run the application:

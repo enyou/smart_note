@@ -53,3 +53,20 @@ class StudyPlanTitle(BaseModel):
 # Pydantic Models
 class StudyPlanAiResp(BaseModel):
     ai_response: str
+
+
+class GenPlanGraphState(BaseModel):
+    subject: str
+    # 曾经创建的学习计划
+    history_plan: str
+    # 是否曾经学习过
+    learned_before: Optional[bool] = None
+    # 是否要深入学习
+    want_deep_learn: Optional[bool] = None
+    # 生成的学习计划
+    learning_plan: Optional[str] = None
+    # 用户是否满意
+    is_satisfied: Optional[bool] = None
+    # 当前状态
+    status: str = "start"
+    messages: list

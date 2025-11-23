@@ -11,4 +11,8 @@ email-validator==2.1.0.post1
 langchain == 0.3.0
 langchain-core==0.3.63
 langchain-openai==0.2.0
-
+chroma==0.2.0
+sentence-transformers=5.1.0
+chromadb=1.1.0
+langchain-huggingface=0.3.1
+langgraph-checkpoint-sqlite=2.0.11
