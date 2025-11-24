@@ -3,3 +3,5 @@ __pycache__/
 *.py[cod]
 smart_env/
 .DS_Store
+data/
+checkpoints.db

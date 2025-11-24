@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import json
-
+from langchain_core.messages import HumanMessage
 from app.db.session import get_session
 from app.models.study_plan import GenStudyPlanBase, StudyPlanAiResp, StudyPlanResponse
 from app.services.study_plan_service import study_plan_service, AIStudyRequest
 
 router = APIRouter()
+sessions = {}
 
 
 @router.get("/user/{user_id}", response_model=List[StudyPlanResponse])
@@ -74,3 +75,31 @@ async def save_plan(
 ):
     """在页面中新建学习计划对应的API"""
     return await study_plan_service.create_study_plan_from_ai_response(db, ai_response.ai_response)
+
+
+@router.post("/gen_plan_by_graph")
+async def gen_plan_by_graph(request: Request, session_id: str, text: str, db: AsyncSession = Depends(get_session)):
+    # 获取或初始化 state
+    sessions = request.app.state.sessions
+    graph = request.app.state.graph
+    vector_store = request.app.state.vector_store
+    chroma = request.app.state.chroma
+    state = {}
+    if session_id not in sessions:
+        state = {
+            "learned_before": None,
+            "want_deep_learn": None,
+            "learning_plan": None,
+            "is_satisfied": None,
+            "input_completeness": None,
+            "status": "start",
+            "subject": text,
+            "messages": [HumanMessage(content=text)],
+        }
+    else:
+        state = sessions.get(session_id)
+        if not state["input_completeness"]:
+            state["subject"] = text
+        state["messages"].append(HumanMessage(content=text))
+
+    return StreamingResponse(study_plan_service.event_stream(state, graph, db, sessions, session_id, vector_store, chroma), media_type="text/event-stream")

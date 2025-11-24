@@ -33,3 +33,4 @@ async def chat_common(request: ChatRequest,db: AsyncSession = Depends(get_sessio
     """与AI助手对话"""
     return StreamingResponse(ai_chat_service.generate_stream_by_langchain(user_prompt=request.user_msg), media_type="text/event-stream")
     # return await chat_service.chat_response(db=db, user_msg=request.user_msg)
+

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from typing import Any, Dict, List, Optional, AsyncGenerator
@@ -12,6 +13,7 @@ from pydantic import BaseModel
 from app.llm.ai_service import ai_service
 from app.tools.mk_2_json import markdown_to_json
 from app.llm.prompts import extract_info_prompt
+from langchain_core.messages import AIMessage
 
 
 class AIStudyRequest(BaseModel):
@@ -105,8 +107,8 @@ class StudyPlanService:
             data = json.loads(ai_json_output)
             # 计算时间范围
             total_days = data["total_days"]
-            if re.match("\d+天",data["total_days"]):
-                total_days =  int(data["total_days"].replace("天","").strip())
+            if re.match(r"\d+天", data["total_days"]):
+                total_days = int(data["total_days"].replace("天", "").strip())
             start_time = datetime.now()
             end_time = start_time + timedelta(days=total_days)
 
@@ -180,6 +182,34 @@ class StudyPlanService:
             user_input=msg)
         respon = await ai_service.generate_response(system_prompt, user_prompt)
         return json.loads(respon.content)
+
+    async def event_stream(self, state, graph, db, sessions, session_id, vector_store, chroma):
+        # 边运行边 yield 事件
+        config = {"configurable": {"thread_id": session_id, "db_session":db, "vector_store":vector_store, "chroma": chroma}}
+        output_text = ""
+
+        # 让 checkpointer 自动处理状态恢复，我们只需要传递新消息
+        print(f"开始执行，当前状态: {state.get('status', 'unknown')}")
+        # 使用 astream 执行，checkpointer 会自动从检查点恢复状态
+        async for event in graph.astream(state, config=config):
+            for node_name, partial_state in event.items():
+                if "messages" in partial_state and isinstance(partial_state["messages"][-1], AIMessage):
+                    output_text = partial_state["messages"][-1].content
+
+            # 实时保存状态到内存（作为备份）
+            try:
+                await asyncio.sleep(0.1)
+                current_state = graph.get_state(config)
+                if current_state.values:
+                    sessions[session_id] = current_state.values
+                    print(f"保存状态: {current_state.values.get('status')}")
+            except Exception as e:
+                print(f"状态保存失败: {e}")
+
+            print("-----------------------")
+            if output_text:
+                yield output_text
+                break
 
 
 # Global instance
