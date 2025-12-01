@@ -44,33 +44,6 @@ class State(TypedDict):
     messages: Annotated[List, add_messages]  # 关键：使用 Annotated 和 add_messages
 
 
-# 初始化向量数据库
-# documents = ["这是一个为期5天的Python学习计划，适合没有Python基础但希望快速Python并能够编写简单脚本的学习者。计划从基础语法开始，逐步深入到函数、文件操作和简单脚本编写。",
-#              "本计划为3天的PHP学习计划，适合零基础但希望快速掌握PHP并能够开发简单Web应用的学习者。计划从PHP基础语法开始，逐步深入到Web开发的核心概念，最后通过实践项目巩固所学知识。",
-#              "本计划旨在帮助学习者系统掌握PMP考试的核心知识领域，包括项目管理过程、知识领域、职业道德等。计划从基础概念入手，逐步深入到复杂场景应用，每天安排适量的学习内容，结合理论与实践，确保学习者能够全面理解并应用项目管理知识。"
-#              ]
-# docs = [Document(page_content=text) for text in documents]
-# embedding_model = HuggingFaceEmbeddings(
-#     model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-#     model_kwargs={
-#         'device': 'cpu',
-#         'trust_remote_code': True
-#     },
-#     encode_kwargs={
-#         'normalize_embeddings': True,
-#         'batch_size': 32
-#     }
-# )
-# vectorstore = Chroma.from_documents(
-#     documents=docs,
-#     embedding=embedding_model,
-#     collection_name="smart_note",
-# )
-# retriever = vectorstore.as_retriever(search_kwargs={"k": 1})
-
-# 输入的信息是否完整
-
-
 def check_input_info(subject: str) -> bool:
     """
     检查用户输入的信息是否完整。

@@ -1,4 +1,5 @@
 import os
+from pydantic import Field
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 load_dotenv()
@@ -28,8 +29,12 @@ class Settings(BaseSettings):
 
     # # OpenAI settings
     OPENAI_API_KEY: str = get_env_value('OPENAI_API_KEY')  # 在生产环境中使用环境变量
-    OPENAI_API_URL: str = get_env_value('OPENAI_API_URL') 
-    OPENAI_MODEL_NAME: str = get_env_value('OPENAI_MODEL_NAME') 
+    OPENAI_API_URL: str = get_env_value('OPENAI_API_URL')
+    OPENAI_MODEL_NAME: str = get_env_value('OPENAI_MODEL_NAME')
+
+    # logging setting
+    log_level: str = get_env_value("LOG_LEVEL")
+    log_path: str = get_env_value("LOG_PATH")
 
     class Config:
         env_file = ".env"
