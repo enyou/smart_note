@@ -21,10 +21,6 @@ class AIService:
     async def generate_response(self, system_prompt: str, user_prompt: str) -> AIResponse:
         """调用大模型API生成响应"""
         try:
-            # # 设置代理
-            # os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
-            # os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
-
             # 初始化 OpenAI 客户端
             client = AsyncOpenAI(
                 api_key=os.getenv("OPENAI_API_KEY"),

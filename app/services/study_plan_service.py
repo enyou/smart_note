@@ -1,19 +1,25 @@
 import asyncio
 import json
 import re
+import traceback
 from typing import Any, Dict, List, Optional, AsyncGenerator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.study_plan import StudyPlanCreate
-from app.models.db_models import Note, StudyPlan
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-from app.llm.ai_service import ai_service
-from app.tools.mk_2_json import markdown_to_json
-from app.llm.prompts import extract_info_prompt
 from langchain_core.messages import AIMessage
+from app.llm.ai_service import ai_service
+from app.utils.logger import get_logger
+from app.utils.mk_2_json import markdown_to_json
+from app.llm.prompts import extract_info_prompt
+from app.models.study_plan import StudyPlanCreate
+from app.models.db_models import Note, StudyPlan
+from app.core.dependencies import method_logger
+
+
+logger = get_logger(__name__)
 
 
 class AIStudyRequest(BaseModel):
@@ -27,6 +33,7 @@ class AIStudyRequest(BaseModel):
 
 class StudyPlanService:
 
+    @method_logger
     def _generate_system_prompt(self) -> str:
         """生成系统提示词"""
         system_prompt = """
@@ -37,14 +44,12 @@ class StudyPlanService:
             3. 知识点之间有合理的联系
             4. 每天的主题明确，知识点具体
             5. 知识点应当可操作和可实践
-            
-            
             """
         return system_prompt
 
+    @method_logger
     def _generate_user_prompt(self, request: AIStudyRequest) -> str:
         """生成用户提示词"""
-
         user_prompt = f"""
             主题：{request.subject}
             计划天数：{request.total_days}天
@@ -72,6 +77,7 @@ class StudyPlanService:
         """
         return user_prompt
 
+    @method_logger
     async def generate_study_plan(self, request: AIStudyRequest) -> str:
         """使用AI生成学习计划"""
         system_prompt = self._generate_system_prompt()
@@ -79,6 +85,7 @@ class StudyPlanService:
         response = await ai_service.generate_response(system_prompt, user_prompt)
         return response.content
 
+    @method_logger
     async def generate_study_plan_stream(self, request: AIStudyRequest) -> AsyncGenerator[str, None]:
         """使用AI生成学习计划（流式返回）"""
         system_prompt = self._generate_system_prompt()
@@ -86,6 +93,7 @@ class StudyPlanService:
         async for chunk in ai_service.generate_stream_response(system_prompt, user_prompt):
             yield chunk
 
+    @method_logger
     async def create_study_plan_with_ai(
         self,
         db: AsyncSession,
@@ -96,6 +104,7 @@ class StudyPlanService:
         ai_json_output = markdown_to_json(ai_response)
         return await self.create_study_plan_from_ai_response(db, ai_json_output, request)
 
+    @method_logger
     async def create_study_plan_from_ai_response(
         self,
         db: AsyncSession,
@@ -103,6 +112,7 @@ class StudyPlanService:
     ) -> StudyPlan:
         """从AI响应创建学习计划"""
         try:
+            logger.info("从AI的响应结果提取信息并输出成json")
             ai_json_output = markdown_to_json(ai_response)
             data = json.loads(ai_json_output)
             # 计算时间范围
@@ -113,6 +123,7 @@ class StudyPlanService:
             end_time = start_time + timedelta(days=total_days)
 
             # 创建主学习计划
+            logger.info("创建学习计划")
             study_plan = StudyPlan(
                 title=data["title"],
                 content=data["content"],
@@ -125,9 +136,8 @@ class StudyPlanService:
 
             db.add(study_plan)
             await db.flush()
-
-            # 为每天创建笔记模板
-
+            logger.info("创建学习计划完成")
+            logger.info("为每天创建笔记模板")
             for day_plan in data["daily_plans"]:
                 day_start = start_time + timedelta(days=day_plan["day"]-1)
                 note_create = Note(
@@ -142,12 +152,14 @@ class StudyPlanService:
                     is_completed=False
                 )
                 db.add(note_create)
-
+            logger.info("笔记模板创建完成")
             return study_plan
         except Exception as e:
+            logger.error(traceback.format_exc())
             raise HTTPException(
                 status_code=400, detail=f"Error parsing AI response: {str(e)}")
 
+    @method_logger
     def create_study_plan(self, db: AsyncSession, study_plan: StudyPlanCreate, user_id: int) -> StudyPlan:
         db_study_plan = StudyPlan(
             title=study_plan.title,
@@ -166,16 +178,19 @@ class StudyPlanService:
             raise HTTPException(
                 status_code=400, detail="Error creating study plan")
 
+    @method_logger
     async def get_user_study_plans(self, db: AsyncSession, user_id: int) -> List[StudyPlan]:
         stm = select(StudyPlan).where(StudyPlan.user_id == user_id)
         result = await db.execute(stm)
         return result.scalars().all()
 
+    @method_logger
     async def get_study_plan(self, db: AsyncSession, plan_id: int) -> Optional[StudyPlan]:
         stm = select(StudyPlan).where(StudyPlan.id == plan_id)
         result = await db.execute(stm)
         return result.scalars().one_or_none()
 
+    @method_logger
     async def get_import_infor(self, msg: str) -> Dict[str, Any]:
         system_prompt = extract_info_prompt.ExtractInfoPrompt.SYS_PROMPT
         user_prompt = extract_info_prompt.ExtractInfoPrompt.USER_PROMPT.format(
@@ -183,30 +198,33 @@ class StudyPlanService:
         respon = await ai_service.generate_response(system_prompt, user_prompt)
         return json.loads(respon.content)
 
+    @method_logger
     async def event_stream(self, state, graph, db, sessions, session_id, vector_store, chroma):
         # 边运行边 yield 事件
-        config = {"configurable": {"thread_id": session_id, "db_session":db, "vector_store":vector_store, "chroma": chroma}}
+        config = {"configurable": {"thread_id": session_id,
+                                   "db_session": db, "vector_store": vector_store, "chroma": chroma}}
         output_text = ""
 
         # 让 checkpointer 自动处理状态恢复，我们只需要传递新消息
-        print(f"开始执行，当前状态: {state.get('status', 'unknown')}")
+        logger.info(
+            f"开始执行，当前状态: {state.get('status', 'unknown')}", session_id=session_id)
         # 使用 astream 执行，checkpointer 会自动从检查点恢复状态
         async for event in graph.astream(state, config=config):
             for node_name, partial_state in event.items():
+                logger.info(f"执行节点名称:{node_name}", session_id=session_id)
                 if "messages" in partial_state and isinstance(partial_state["messages"][-1], AIMessage):
                     output_text = partial_state["messages"][-1].content
 
-            # 实时保存状态到内存（作为备份）
+            logger.info("实时保存状态")
             try:
                 await asyncio.sleep(0.1)
                 current_state = graph.get_state(config)
                 if current_state.values:
                     sessions[session_id] = current_state.values
-                    print(f"保存状态: {current_state.values.get('status')}")
+                    logger.info(f"保存状态: {current_state.values.get('status')}")
             except Exception as e:
-                print(f"状态保存失败: {e}")
+                logger.info(f"状态保存失败: {e}")
 
-            print("-----------------------")
             if output_text:
                 yield output_text
                 break
