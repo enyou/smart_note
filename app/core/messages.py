@@ -16,7 +16,16 @@ class ErrorMessages:
     LLM_CALLING_ERROR = "系统出现异常了。。请稍后重试！"
     LLM_CONN_TIMEOUT = "大模型服务连接超时，请检测你网络"
 
+
 class CommonMessages:
 
-    #大模型
+    # 大模型
     LLM_PROCESS_FINISH = "***完了***\n\n"
+
+
+class UserMessages:
+    PWD_DIFF = "输入的密码不相同，请重新输入。"
+    USER_NOT_FOUND = "用户不存在"
+    USER_OR_PWD_INCORRECT = "输入的用户名和密码不正确"
+    USERNAME_EXIST = "用户名存在，请更换用户名"
+    EMAIL_EXIST = "邮箱已经存在，请更换邮箱"

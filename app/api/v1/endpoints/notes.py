@@ -17,7 +17,16 @@ router = APIRouter()
 @method_logger
 @router.get("/study-plan/{study_plan_id}", response_model=List[NoteResponse])
 async def get_study_plan_notes(study_plan_id: int, db: AsyncSession = Depends(get_session)):
-    """获取该学习计划下面的全部notes"""
+    """
+    获取该学习计划下面的全部notes
+
+    Args:
+        study_plan_id: 学习计划ID
+        db: 数据库连接实例
+
+    Retrun:
+        list: 学习计划下的全部note的list
+    """
     logger.info("获取该学习计划下面的全部notes")
     notes = await note_service.get_study_plan_notes(db, study_plan_id)
     return [NoteResponse.model_validate(note) for note in notes]
@@ -26,7 +35,17 @@ async def get_study_plan_notes(study_plan_id: int, db: AsyncSession = Depends(ge
 @method_logger
 @router.get("/{note_id}", response_model=NoteResponse)
 async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
-    """获取笔记的详细信息"""
+    """
+    获取笔记的详细信息
+
+    Args:
+        note_id: note id
+        db: 数据库连接实例
+
+    Retrun:
+        Note: note信息
+
+    """
     logger.info(f"取笔记的详细信息note_id:{note_id}")
     note = await note_service.get_note(db, note_id)
     if note is None:
@@ -38,7 +57,16 @@ async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
 @method_logger
 @router.get("/{note_id}/details", response_model=NoteResponse)
 async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
-    """获取笔记的具体要学习的内容"""
+    """
+    获取笔记的具体要学习的内容
+
+    Args:
+        note_id: note id
+        db: 数据库连接实例
+
+    Retrun:
+        StreamingResponse: AI生成的具体学习的内容
+    """
     logger.info("获取笔记的具体要学习的内容")
     return StreamingResponse(note_service.generate_detailed_content(db, note_id), media_type="text/event-stream")
 
@@ -46,7 +74,18 @@ async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
 @method_logger
 @router.put("/{note_id}", response_model=NoteResponse)
 async def update_note(note_id: int, note: NoteUpdate, db: AsyncSession = Depends(get_session)):
-    """更新笔记的详细信息"""
+    """
+    更新笔记的详细信息
+
+     Args:
+        note_id: note id
+        note: noted对象
+        db: 数据库连接实例
+
+    Retrun:
+        Note: 更新后的note对象
+
+    """
     logger.info(f"更新笔记的详细信息 note_id:{note_id}")
     updated_note = await note_service.update_note(db, note_id, note)
     if updated_note is None:
@@ -57,7 +96,15 @@ async def update_note(note_id: int, note: NoteUpdate, db: AsyncSession = Depends
 @method_logger
 @router.get("/current_day/list", response_model=List[CurrentDayNote])
 async def get_current_day_notes(db: AsyncSession = Depends(get_session)):
-    """获取该学习计划下面的全部notes"""
+    """
+    获取当天的学习的note
+
+    Args:
+        db: 数据库连接实例
+
+    Retrun:
+        list: note列表
+    """
     logger.info(f"获取该学习计划下面的全部notes")
     resp = await note_service.get_currend_day_notes(db)
     return resp

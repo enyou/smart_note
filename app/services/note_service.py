@@ -1,9 +1,11 @@
 from datetime import datetime
+import traceback
 from typing import List, Optional
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.messages import CommonMessages, ErrorMessages
+from app.llm.prompts.gen_note_detail_prompt import GenNoteDetailPrompt
 from app.models.note import NoteUpdate
 from app.models.db_models import Note
 from app.services.study_plan_service import study_plan_service
@@ -19,7 +21,17 @@ class NoteService:
 
     @method_logger
     async def get_note(self, db: AsyncSession, note_id: int) -> Optional[Note]:
-        """获取点击的note"""
+        """
+        获取note信息
+
+        Args:
+            self: cls
+            db: 数据库连接实例
+            note_id: note id
+
+        Retrun:
+           Note: node_id对应的note信息
+        """
         stm = select(Note).where(Note.id == note_id)
         result = await db.execute(stm)
         note = result.scalars().one_or_none()
@@ -32,7 +44,17 @@ class NoteService:
 
     @method_logger
     async def get_study_plan_notes(self, db: AsyncSession, study_plan_id: int) -> List[Note]:
-        """获取该学习计划下面的全部notes"""
+        """
+        获取某一学习计划下面的全部note
+
+        Args:
+            self: cls
+            db: 数据库连接实例
+            study_plan_id: 学习计划id
+
+        Return:
+            List[Note]: study_plan_id下的全部笔记
+        """
         stm = select(Note).where(Note.study_plan_id == study_plan_id)
         result = await db.execute(stm)
         return result.scalars().all()
@@ -95,6 +117,7 @@ class NoteService:
                 yield chunk
 
         except Exception as e:
+            logger.error(traceback.format_exc())
             gen_success_flg = False
             yield ErrorMessages.LLM_CALLING_ERROR
         finally:
@@ -109,10 +132,9 @@ class NoteService:
     @method_logger
     def _get_knowledge_points(self, previous_notes: List[Note]):
         """获取之前每日学习的知识点
-            从格式化的文本中提取每日学习要点
-            返回知识点列表
+           从格式化的文本中提取每日学习要点
+           返回知识点列表
         """
-
         knowledge_points = []
         for note in previous_notes:
             if not note.study_content:
@@ -137,48 +159,8 @@ class NoteService:
         if knowledge_points:
             previous_content = ",".join(knowledge_points)
 
-        prompt = f"""作为一个专业的教育顾问，为了能够达到学习计划的总体目标，请为今天要学习的知识点生成详细的学习指南。
-                    同时请根据之前学习过的内容，在本内容开始之前，对之前学习过的内容展开简要的复习。
-                    学习计划总体目标：
-                    {study_plan.content}
-
-                    之前已学习的内容：
-                    {previous_content}
-
-                    请按照以下结构提供详细的学习内容：
-
-                    1. 知识点复习
-                    - 针对每个要复习的知识点，给出简要的说明
-                    - 针对说明给出实例的例子
-
-                    2. 核心概念详解
-                    - 为每个知识点提供清晰的定义和解释
-                    - 包含实际的例子和应用场景
-                    - 指出常见的误解和注意事项
-
-                    3. 实践练习
-                    - 针对每个知识点设计练习题
-                    - 提供实际操作的小项目或任务
-                    - 包含练习的参考答案或解决方案
-
-                    4. 知识点关联
-                    - 说明与之前学习内容的联系
-                    - 解释知识点之间的关系
-                    - 指出在未来学习中的应用
-
-                    5. 今日复习重点
-                    - 总结当天的关键知识点
-                    - 提供快速复习的方法
-                    - 设计复习检查清单
-
-                    6. 扩展资源
-                    - 推荐进一步学习的材料
-                    - 相关的在线资源或工具
-                    - 补充阅读建议
-
-                    请确保内容具体、实用，并且易于理解和操作。重点关注知识的实际应用和与之前学习内容的联系。
-             """
-
+        prompt = GenNoteDetailPrompt.SYS_PROMPT.format(study_plan_content=study_plan.content,
+                                                       previous_content=previous_content)
         return prompt
 
     @method_logger
@@ -186,12 +168,7 @@ class NoteService:
         """生成用户提示词"""
         knowledge_points = self._get_knowledge_points([current_note])
         topics = ",".join(knowledge_points)
-        prompt = f"""
-                今天将要学习的知识点如下：
-                   {topics}
-
-                请用中文给我一个详细的学习指南。
-                """
+        prompt = GenNoteDetailPrompt.USER_PROMPT.format(topics=topics)
         return prompt
 
 
