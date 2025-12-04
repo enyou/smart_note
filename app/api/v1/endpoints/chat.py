@@ -27,7 +27,16 @@ router = APIRouter()
 @method_logger
 @router.post("/chat")
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_session)):
-    """与AI助手对话"""
+    """
+    与AI助手对话
+
+    Args:
+        request: ChatRequest模型数据
+        db: 数据库连接实例
+
+    Request:
+        StreamingResponse: AI的回复内容
+    """
 
     session_id = "{}_{}".format(request.user_id, request.note_id)
     logger.info(f"与AI助手对话 session id {session_id}")

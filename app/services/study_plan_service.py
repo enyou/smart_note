@@ -2,19 +2,16 @@ import asyncio
 import json
 import re
 import traceback
-from typing import Any, Dict, List, Optional, AsyncGenerator
+from datetime import datetime, timedelta
+from typing import List, Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
-from datetime import datetime, timedelta
-from pydantic import BaseModel
 from langchain_core.messages import AIMessage
-from app.llm.ai_service import ai_service
+
 from app.utils.logger import get_logger
 from app.utils.mk_2_json import markdown_to_json
-from app.llm.prompts import extract_info_prompt
-from app.models.study_plan import StudyPlanCreate
 from app.models.db_models import Note, StudyPlan
 from app.core.dependencies import method_logger
 
@@ -22,87 +19,7 @@ from app.core.dependencies import method_logger
 logger = get_logger(__name__)
 
 
-class AIStudyRequest(BaseModel):
-    subject: str
-    total_days: int
-    difficulty_level: str = "intermediate"  # beginner, intermediate, advanced
-    prior_knowledge: str = ""
-    specific_goals: str = ""
-    user_id: int
-
-
 class StudyPlanService:
-
-    @method_logger
-    def _generate_system_prompt(self) -> str:
-        """生成系统提示词"""
-        system_prompt = """
-            你是一个专业的教育顾问，请根据用户输入的内容（包括主题、计划天数、难度级别、已有知识背景、具体学习目标），制定一个学习计划。
-            请确保：
-            1. 知识点循序渐进，由浅入深
-            2. 每天的学习内容适量，考虑学习者的接受能力
-            3. 知识点之间有合理的联系
-            4. 每天的主题明确，知识点具体
-            5. 知识点应当可操作和可实践
-            """
-        return system_prompt
-
-    @method_logger
-    def _generate_user_prompt(self, request: AIStudyRequest) -> str:
-        """生成用户提示词"""
-        user_prompt = f"""
-            主题：{request.subject}
-            计划天数：{request.total_days}天
-            难度级别：{request.difficulty_level}
-            已有知识背景：{request.prior_knowledge}
-            具体学习目标：{request.specific_goals}
-            我是一个中文用户，请用中文回答我的问题。
-            请根据以上内容，为我设定一个学习计划。
-            在输出时，请按照以下格式提供学习计划,其他无关内容不要输出：
-            
-            ### 学习主题: 学习的主题
-            ### 学习天数: 计划天数
-            ### 学习目标: 具体学习目标
-            ### 学习计划描述:
-                总体学习概述
-            ### 学习计划大纲
-            **第n天(n从1开始)**
-            * 学习内容:当天主要学习主题 
-            * 学习知识点:
-            1. 关键知识点1
-            2. 关键知识点2
-            3. 关键知识点3
-            4. ......
-  
-        """
-        return user_prompt
-
-    @method_logger
-    async def generate_study_plan(self, request: AIStudyRequest) -> str:
-        """使用AI生成学习计划"""
-        system_prompt = self._generate_system_prompt()
-        user_prompt = self._generate_user_prompt(request)
-        response = await ai_service.generate_response(system_prompt, user_prompt)
-        return response.content
-
-    @method_logger
-    async def generate_study_plan_stream(self, request: AIStudyRequest) -> AsyncGenerator[str, None]:
-        """使用AI生成学习计划（流式返回）"""
-        system_prompt = self._generate_system_prompt()
-        user_prompt = self._generate_user_prompt(request)
-        async for chunk in ai_service.generate_stream_response(system_prompt, user_prompt):
-            yield chunk
-
-    @method_logger
-    async def create_study_plan_with_ai(
-        self,
-        db: AsyncSession,
-        request: AIStudyRequest
-    ) -> StudyPlan:
-        """使用AI生成并创建学习计划"""
-        ai_response = await self.generate_study_plan(request)
-        ai_json_output = markdown_to_json(ai_response)
-        return await self.create_study_plan_from_ai_response(db, ai_json_output, request)
 
     @method_logger
     async def create_study_plan_from_ai_response(
@@ -110,7 +27,18 @@ class StudyPlanService:
         db: AsyncSession,
         ai_response: str,
     ) -> StudyPlan:
-        """从AI响应创建学习计划"""
+        """
+        创建学习计划
+
+        Args:
+            self: cls
+            db: 数据库连接实例
+            ai_response: 大模型返回的内容
+
+        Retrun:
+            StudyPlan: 创建好的学习计划
+        """
+
         try:
             logger.info("从AI的响应结果提取信息并输出成json")
             ai_json_output = markdown_to_json(ai_response)
@@ -160,49 +88,60 @@ class StudyPlanService:
                 status_code=400, detail=f"Error parsing AI response: {str(e)}")
 
     @method_logger
-    def create_study_plan(self, db: AsyncSession, study_plan: StudyPlanCreate, user_id: int) -> StudyPlan:
-        db_study_plan = StudyPlan(
-            title=study_plan.title,
-            content=study_plan.content,
-            start_time=study_plan.start_time,
-            end_time=study_plan.end_time,
-            user_id=user_id
-        )
-        try:
-            db.add(db_study_plan)
-            db.commit()
-            db.refresh(db_study_plan)
-            return db_study_plan
-        except IntegrityError:
-            db.rollback()
-            raise HTTPException(
-                status_code=400, detail="Error creating study plan")
-
-    @method_logger
     async def get_user_study_plans(self, db: AsyncSession, user_id: int) -> List[StudyPlan]:
+        """
+        获取某用户下面的全部学习计划
+
+        Args:
+            self: cls
+            db: 数据库连接实例
+            user_id: 用户id
+
+        Return
+            List[StudyPlan] : 学习计划的List
+        """
         stm = select(StudyPlan).where(StudyPlan.user_id == user_id)
         result = await db.execute(stm)
         return result.scalars().all()
 
     @method_logger
     async def get_study_plan(self, db: AsyncSession, plan_id: int) -> Optional[StudyPlan]:
+        """
+        获取学习计划
+
+        Args:
+            self: cls
+            db: 数据库连接实例
+            plan_id: 要获取的学习计划的ID
+
+        Returs:
+            StudyPlan|None : plan_id对应的StudyPlan。如果没有获取到，返回None。
+        """
         stm = select(StudyPlan).where(StudyPlan.id == plan_id)
         result = await db.execute(stm)
         return result.scalars().one_or_none()
 
     @method_logger
-    async def get_import_infor(self, msg: str) -> Dict[str, Any]:
-        system_prompt = extract_info_prompt.ExtractInfoPrompt.SYS_PROMPT
-        user_prompt = extract_info_prompt.ExtractInfoPrompt.USER_PROMPT.format(
-            user_input=msg)
-        respon = await ai_service.generate_response(system_prompt, user_prompt)
-        return json.loads(respon.content)
+    async def ge_study_plan_event_stream(self, state, graph, db, sessions, session_id, vector_store, chroma):
+        """
+        生成学习计划
 
-    @method_logger
-    async def event_stream(self, state, graph, db, sessions, session_id, vector_store, chroma):
+        Args:
+            self: cls
+            state: graph中的state
+            graph: graph实例
+            db: 数据库连接实例
+            sessions: fastapi的全局变量sessions
+            ession_id: 代表当前回话的唯一的ID
+            vector_store: 向量存储的实例
+            chroma: chroma的实例
+
+        """
         # 边运行边 yield 事件
         config = {"configurable": {"thread_id": session_id,
-                                   "db_session": db, "vector_store": vector_store, "chroma": chroma}}
+                                   "db_session": db,
+                                   "vector_store": vector_store,
+                                   "chroma": chroma}}
         output_text = ""
 
         # 让 checkpointer 自动处理状态恢复，我们只需要传递新消息

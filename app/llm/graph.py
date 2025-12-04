@@ -14,13 +14,17 @@ from langchain_core.messages.ai import AIMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
 from app.llm.llm_loader import llm
+from app.llm.prompts.check_input_completeness_prompt import CheckInputCompletenessPrompt
+from app.llm.prompts.gen_plan_prompt import GenPlanPrompt
 from app.services.study_plan_service import study_plan_service
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import method_logger
+from app.utils.logger import get_logger
+
+
+logger = get_logger(__name__)
 # 定义状态
 
 
@@ -44,21 +48,14 @@ class State(TypedDict):
     messages: Annotated[List, add_messages]  # 关键：使用 Annotated 和 add_messages
 
 
+@method_logger
 def check_input_info(subject: str) -> bool:
     """
     检查用户输入的信息是否完整。
     """
-    prompt = ChatPromptTemplate.from_template("""你是一个信息判断助手，根据用户的输入内容，判断用户输入的信息是否完整。
-               #输入内容：{input}
-               #输入是否完整的判断标准如下：
-                1. 是否输入要达成的目标
-                2. 是否输入当前的知识水平
-               #输出要求
-                1.输出的内容只能是：“是”或者“不是”
-                2.如果用户输入了目标和当前水平，则输出“是”。
-                3.如果用户没有输入目标和当前水平，则输出“不是”。
-                4.必须按照上述要求输出，不能随意输出其他内容
-            """)
+    logger.info("检查用户输入的信息是否完整")
+    prompt = ChatPromptTemplate.from_template(
+        CheckInputCompletenessPrompt.PROMPT)
     chains = prompt | llm
     response = chains.invoke(input=subject)
     return response.content
@@ -66,85 +63,30 @@ def check_input_info(subject: str) -> bool:
 # RAG检索函数
 
 
+@method_logger
 def retrieve_learning_history(subject: str, vectorstore) -> str:
     """
     检查用户是否曾经学习过该主题。如果学习过该主题，则返回学习过的内容。
     """
+    logger.info("检查用户是否曾经学习过该主题")
     docs = vectorstore.similarity_search_with_score(subject, k=3)
     contexts = [doc[0].page_content for doc in docs if doc[1] > 7]
     return "\n".join(contexts)
 
 
 # 生成学习计划函数
+@method_logger
 def generate_learning_plan(subject: str, history_study_plan: str, level: Literal["beginner", "advanced"]) -> str:
     """生成学习计划"""
+    logger.info(f"生成学习计划, 计划主题:{subject}, 当前水平: {level}")
     input = {"subject": subject}
     if level == "beginner":
         prompt_template = ChatPromptTemplate.from_template(
-            """你是一个专业的教育顾问，请根据用户输入的内容，为用户制定一个的入门级别的学习计划。
-            请确保：
-            1. 知识点循序渐进，由浅入深
-            2. 每天的学习内容适量，考虑学习者的接受能力
-            3. 知识点之间有合理的联系
-            4. 每天的主题明确，知识点具体
-            5. 知识点应当可操作和可实践
-            输入内容：
-                主题：{subject}
-            输出要求：
-            1. 我是一个中文用户，请用中文回答我的问题。
-            2. 如果用户没有明确的提出计划的天数，请制定一份10天的学习计划。
-            3. 必须严格的输出每一天的安排。
-            4. 在输出时，请按照以下格式输出计划内容,其他无关内容不要输出：
-            
-            ### 学习主题: 学习的主题
-            ### 学习天数: 计划天数
-            ### 学习目标: 具体学习目标
-            ### 学习计划描述:
-                总体学习概述
-            ### 学习计划大纲
-            **第n天(n从1开始)**
-            * 学习内容:当天主要学习主题 
-            * 学习知识点:
-            1. 关键知识点1
-            2. 关键知识点2
-            3. 关键知识点3
-            4. ......
-        """
-        )
+            GenPlanPrompt.PROMPT_WITHOUT_HISTORY)
     else:
         prompt_template = PromptTemplate(
             input_variables=["history_study_plan", "subject"],
-            template="""你是一个专业的教育顾问，请在根据用户以往的学习履历，推断出用户已经掌握的知识点。并为用户制定一个更深入的学习计划。
-            请确保：
-            1. 知识点循序渐进，由浅入深
-            2. 每天的学习内容适量，考虑学习者的接受能力
-            3. 知识点之间有合理的联系
-            4. 每天的主题明确，知识点具体
-            5. 知识点应当可操作和可实践
-            以往的学习履历：
-                {history_study_plan}
-            输入内容：
-                {subject}
-            输出要求：
-            1. 我是一个中文用户，请用中文回答我的问题。
-            2. 如果用户没有明确的提出计划的天数，请制定一份10天的学习计划。
-            3. 必须严格的输出每一天的安排。
-            4. 在输出时，请按照以下格式输出计划内容,其他无关内容不要输出：
-            
-            ### 学习主题: 学习的主题
-            ### 学习天数: 计划天数
-            ### 学习目标: 具体学习目标
-            ### 学习计划描述:
-                总体学习概述
-            ### 学习计划大纲
-            **第n天(n从1开始)**
-            * 学习内容:当天主要学习主题 
-            * 学习知识点:
-            1. 关键知识点1
-            2. 关键知识点2
-            3. 关键知识点3
-            4. ......
-        """
+            template=GenPlanPrompt.PROMPT_WITH_HISTORY
         )
         input["history_study_plan"] = history_study_plan
     chains = prompt_template | llm
@@ -154,9 +96,10 @@ def generate_learning_plan(subject: str, history_study_plan: str, level: Literal
 # 定义各个节点
 
 
+@method_logger
 def check_input_completeness_node(state: State) -> State:
     """查用户输入的信息是否完整节点"""
-    print("正在用户输入的信息是否完整...")
+    logger.info("检查户输入的信息是否完整节点")
 
     result = check_input_info(state["messages"][-1])
     is_completeness = False
@@ -177,9 +120,10 @@ def check_input_completeness_node(state: State) -> State:
     }
 
 
+@method_logger
 def retrieve_node(state: State, config) -> State:
     """检索学习历史节点"""
-    print("正在检索您的学习历史...")
+    logger.info("检索学习历史节点")
     vector_store = config["configurable"].get("vector_store")
     result = retrieve_learning_history(state["subject"], vector_store)
     has_learned = False
@@ -188,9 +132,11 @@ def retrieve_node(state: State, config) -> State:
     return {"learned_before": has_learned, "status": "retrieved",  "history_plan": result}
 
 
+@method_logger
 def ask_deep_learn_node(state: State) -> State:
     """询问是否深入学习节点"""
-    print("询问是否深入学习...")
+    logger.info("询问是否深入学习节点")
+    logger.info(f"之前是否学习过:{state["learned_before"]}")
     if state["learned_before"]:
         return {
             "status": "asking_deep_learn",
@@ -203,9 +149,10 @@ def ask_deep_learn_node(state: State) -> State:
         return {"status": "generate_beginner_plan"}
 
 
+@method_logger
 def handle_deep_learn_response_node(state: State) -> State:
     """处理用户是否深入学习的响应"""
-    print("处理用户是否深入学习的响应 state:", state)
+    logger.info("处理用户是否深入学习的响应节点:")
     last_message = state["messages"][-1]
     if isinstance(last_message, HumanMessage):
         response = last_message.content.lower()
@@ -216,14 +163,16 @@ def handle_deep_learn_response_node(state: State) -> State:
     return {"status": "generate_beginner_plan"}
 
 
+@method_logger
 def generate_plan_node(state: State) -> State:
     """生成学习计划节点"""
+    logger.info("生成学习计划节点")
     if state.get("want_deep_learn", False) or (state["learned_before"] and state.get("want_deep_learn", True)):
         level = "advanced"
     else:
         level = "beginner"
 
-    print(f"正在生成{'进阶' if level == 'advanced' else '初级'}学习计划...")
+    logger.info(f"正在生成{'进阶' if level == 'advanced' else '初级'}学习计划...")
     plan = generate_learning_plan(
         state["subject"], state['history_plan'], level)
 
@@ -236,8 +185,10 @@ def generate_plan_node(state: State) -> State:
     }
 
 
+@method_logger
 def handle_feedback_node(state: State) -> State:
     """处理用户反馈节点"""
+    logger.info("处理用户反馈节点")
     last_message = state["messages"][-1]
     if isinstance(last_message, HumanMessage):
         response = last_message.content.lower()
@@ -248,9 +199,10 @@ def handle_feedback_node(state: State) -> State:
     return {"is_satisfied": False, "status": "adjust_plan"}
 
 
+@method_logger
 async def save_plan_node(state: State, config) -> State:
     """保存学习计划节点"""
-    print("正在保存学习计划...")
+    logger.info("保存学习计划节点")
     # 这里应该是实际保存到数据库的逻辑
     db_session = config["configurable"].get("db_session")
     plan = await study_plan_service.create_study_plan_from_ai_response(db_session, state["learning_plan"])
@@ -265,14 +217,14 @@ async def save_plan_node(state: State, config) -> State:
     }
 
 
+@method_logger
 def adjust_plan_node(state: State) -> State:
     """调整学习计划节点"""
+    logger.info("调整学习计划节点")
     last_message = state["messages"][-1]
     if isinstance(last_message, HumanMessage):
         feedback = last_message.content
         # 基于用户反馈重新生成计划
-        print("正在根据您的反馈调整学习计划...")
-
         # 确定当前级别
         level = "advanced" if state.get(
             "want_deep_learn", False) else "beginner"
@@ -308,19 +260,22 @@ builder.add_node("adjust_plan", adjust_plan_node)
 # 动态入口点函数
 
 
+@method_logger
 def get_entry_point(state: State) -> str:
     """根据状态动态决定入口点"""
-    if state.get("status") == "start" or not state.get("status") or state.get("status") == "checking_input_completeness":
+    status = state.get("status")
+    logger.info(f"当前状态:{status}")
+    if status or not status or status == "checking_input_completeness":
         return "check_input_completeness"
-    if state.get("status") == "retrieve":
+    if status == "retrieve":
         return "retrieve"
-    elif state.get("status") == "asking_deep_learn":
+    elif status == "asking_deep_learn":
         return "handle_deep_learn_response"
-    elif state.get("status") == "generate_beginner_plan" or state.get("status") == "generate_advanced_plan":
+    elif status == "generate_beginner_plan" or status == "generate_advanced_plan":
         return "generate_plan"
-    elif state.get("status") == "presenting_plan":
+    elif status == "presenting_plan":
         return "handle_feedback"
-    elif state.get("status") == "adjust_plan":
+    elif status == "adjust_plan":
         return "adjust_plan"
     else:
         return "check_input_completeness"

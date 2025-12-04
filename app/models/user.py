@@ -23,12 +23,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    again_password: str
 
 
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
-    password: Optional[str] = None
+class UserPwdUpdate(BaseModel):
+    user_id: int
+    new_password: str
+    again_new_password: str
 
 
 class UserInDB(UserBase):

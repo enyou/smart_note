@@ -1,7 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from fastapi.exceptions import RequestValidationError
 from app.core.config import settings
+from app.core.dependencies import get_current_user
 from app.core.exceptions import http_exception_handler, validation_exception_handler
 from app.core.loggin_config import setup_logging
 from app.db.vector_db_helper import ChromaLangChainManager
@@ -48,9 +50,17 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description=settings.DESCRIPTION,
     version=settings.VERSION,
+    dependencies=[Depends(get_current_user)],
     lifespan=lifespan
 )
 # 添加中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOW_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(LoggingMiddleware, exclude_paths=['/health', '/metrics'])
  
 # 注册自定义异常处理器

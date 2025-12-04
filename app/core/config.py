@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     log_level: str = get_env_value("LOG_LEVEL")
     log_path: str = get_env_value("LOG_PATH")
 
+    # CORS setting
+    ALLOW_ORIGINS = ["*"]
+
     class Config:
         env_file = ".env"
 

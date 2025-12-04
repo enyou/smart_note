@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 from fastapi import HTTPException
 from app.core.dependencies import method_logger
-from app.models.user import UserCreate, UserUpdate
+from app.core.messages import UserMessages
+from app.models.user import UserCreate, UserPwdUpdate
 from app.models.db_models import User
 from app.utils.logger import get_logger
 
@@ -43,12 +44,14 @@ class UserService:
     @method_logger()
     async def create_user(self, db: AsyncSession, user_create: UserCreate) -> User:
         # Check if username or email already exists
+        if user_create.password != user_create.again_password:
+            raise (HTTPException(status_code=400, detail=UserMessages.PWD_DIFF))
         if await self.get_user_by_username(db, user_create.username):
             raise HTTPException(
-                status_code=400, detail="Username already registered")
+                status_code=400, detail=UserMessages.USERNAME_EXIST)
         if await self.get_user_by_email(db, user_create.email):
             raise HTTPException(
-                status_code=400, detail="Email already registered")
+                status_code=400, detail=UserMessages.EMAIL_EXIST)
 
         hashed_password = self.get_password_hash(user_create.password)
         db_user = User(
@@ -63,18 +66,16 @@ class UserService:
         return db_user
 
     @method_logger()
-    async def update_user(self, db: AsyncSession, user_id: int, user_update: UserUpdate) -> Optional[User]:
-        db_user = await self.get_user_by_id(db, user_id)
+    async def update_user_pwd(self, db: AsyncSession, user_pwd_upt: UserPwdUpdate) -> Optional[User]:
+        db_user = await self.get_user_by_id(db, user_pwd_upt.user_id)
         if not db_user:
             return None
-        update_data = user_update.model_dump(exclude_unset=True)
-        if "password" in update_data:
-            update_data["hashed_password"] = self.get_password_hash(
-                update_data.pop("password"))
 
-        for field, value in update_data.items():
-            setattr(db_user, field, value)
-        await db.refresh(db_user, ["updated_at"])
+        hashed_pwd = self.get_password_hash(user_pwd_upt.new_password)
+        db_user.hashed_password = hashed_pwd
+
+        await db.commit()
+        await db.refresh(db_user)
         return db_user
 
     @method_logger()
