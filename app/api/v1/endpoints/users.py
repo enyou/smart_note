@@ -21,7 +21,7 @@ router = APIRouter()
 security = HTTPBearer()
 
 
-@method_logger
+@method_logger()
 @router.post("/", response_model=UserResponse, include_in_schema=False)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_session)):
     """
@@ -37,7 +37,7 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_session))
     return await user_service.create_user(db, user)
 
 
-@method_logger
+@method_logger()
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -57,7 +57,7 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_session)):
     return db_user
 
 
-@method_logger
+@method_logger()
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user_pwd(user_pwd_upt: UserPwdUpdate, db: AsyncSession = Depends(get_session)):
     """
@@ -80,7 +80,7 @@ async def update_user_pwd(user_pwd_upt: UserPwdUpdate, db: AsyncSession = Depend
     return db_user
 
 
-@method_logger
+@method_logger()
 @router.post("/login", response_model=Token, include_in_schema=False)
 async def login(user_credentials: UserLogin, db: AsyncSession = Depends(get_session)):
     """
@@ -109,7 +109,7 @@ async def login(user_credentials: UserLogin, db: AsyncSession = Depends(get_sess
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@method_logger
+@method_logger()
 @router.post("/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
@@ -126,7 +126,7 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return {"message": "Successfully logged out"}
 
 
-@method_logger
+@method_logger()
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """

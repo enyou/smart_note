@@ -48,7 +48,7 @@ class State(TypedDict):
     messages: Annotated[List, add_messages]  # 关键：使用 Annotated 和 add_messages
 
 
-@method_logger
+@method_logger()
 def check_input_info(subject: str) -> bool:
     """
     检查用户输入的信息是否完整。
@@ -63,7 +63,7 @@ def check_input_info(subject: str) -> bool:
 # RAG检索函数
 
 
-@method_logger
+@method_logger()
 def retrieve_learning_history(subject: str, vectorstore) -> str:
     """
     检查用户是否曾经学习过该主题。如果学习过该主题，则返回学习过的内容。
@@ -75,7 +75,7 @@ def retrieve_learning_history(subject: str, vectorstore) -> str:
 
 
 # 生成学习计划函数
-@method_logger
+@method_logger()
 def generate_learning_plan(subject: str, history_study_plan: str, level: Literal["beginner", "advanced"]) -> str:
     """生成学习计划"""
     logger.info(f"生成学习计划, 计划主题:{subject}, 当前水平: {level}")
@@ -96,7 +96,7 @@ def generate_learning_plan(subject: str, history_study_plan: str, level: Literal
 # 定义各个节点
 
 
-@method_logger
+@method_logger()
 def check_input_completeness_node(state: State) -> State:
     """查用户输入的信息是否完整节点"""
     logger.info("检查户输入的信息是否完整节点")
@@ -120,7 +120,7 @@ def check_input_completeness_node(state: State) -> State:
     }
 
 
-@method_logger
+@method_logger()
 def retrieve_node(state: State, config) -> State:
     """检索学习历史节点"""
     logger.info("检索学习历史节点")
@@ -132,7 +132,7 @@ def retrieve_node(state: State, config) -> State:
     return {"learned_before": has_learned, "status": "retrieved",  "history_plan": result}
 
 
-@method_logger
+@method_logger()
 def ask_deep_learn_node(state: State) -> State:
     """询问是否深入学习节点"""
     logger.info("询问是否深入学习节点")
@@ -149,7 +149,7 @@ def ask_deep_learn_node(state: State) -> State:
         return {"status": "generate_beginner_plan"}
 
 
-@method_logger
+@method_logger()
 def handle_deep_learn_response_node(state: State) -> State:
     """处理用户是否深入学习的响应"""
     logger.info("处理用户是否深入学习的响应节点:")
@@ -163,7 +163,7 @@ def handle_deep_learn_response_node(state: State) -> State:
     return {"status": "generate_beginner_plan"}
 
 
-@method_logger
+@method_logger()
 def generate_plan_node(state: State) -> State:
     """生成学习计划节点"""
     logger.info("生成学习计划节点")
@@ -185,7 +185,7 @@ def generate_plan_node(state: State) -> State:
     }
 
 
-@method_logger
+@method_logger()
 def handle_feedback_node(state: State) -> State:
     """处理用户反馈节点"""
     logger.info("处理用户反馈节点")
@@ -199,7 +199,7 @@ def handle_feedback_node(state: State) -> State:
     return {"is_satisfied": False, "status": "adjust_plan"}
 
 
-@method_logger
+@method_logger()
 async def save_plan_node(state: State, config) -> State:
     """保存学习计划节点"""
     logger.info("保存学习计划节点")
@@ -217,7 +217,7 @@ async def save_plan_node(state: State, config) -> State:
     }
 
 
-@method_logger
+@method_logger()
 def adjust_plan_node(state: State) -> State:
     """调整学习计划节点"""
     logger.info("调整学习计划节点")
@@ -260,7 +260,7 @@ builder.add_node("adjust_plan", adjust_plan_node)
 # 动态入口点函数
 
 
-@method_logger
+@method_logger()
 def get_entry_point(state: State) -> str:
     """根据状态动态决定入口点"""
     status = state.get("status")

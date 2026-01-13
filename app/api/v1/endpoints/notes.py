@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@method_logger
+@method_logger()
 @router.get("/study-plan/{study_plan_id}", response_model=List[NoteResponse])
 async def get_study_plan_notes(study_plan_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -32,7 +32,7 @@ async def get_study_plan_notes(study_plan_id: int, db: AsyncSession = Depends(ge
     return [NoteResponse.model_validate(note) for note in notes]
 
 
-@method_logger
+@method_logger()
 @router.get("/{note_id}", response_model=NoteResponse)
 async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -54,7 +54,7 @@ async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
     return note
 
 
-@method_logger
+@method_logger()
 @router.get("/{note_id}/details", response_model=NoteResponse)
 async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -71,7 +71,7 @@ async def get_note(note_id: int, db: AsyncSession = Depends(get_session)):
     return StreamingResponse(note_service.generate_detailed_content(db, note_id), media_type="text/event-stream")
 
 
-@method_logger
+@method_logger()
 @router.put("/{note_id}", response_model=NoteResponse)
 async def update_note(note_id: int, note: NoteUpdate, db: AsyncSession = Depends(get_session)):
     """
@@ -93,7 +93,7 @@ async def update_note(note_id: int, note: NoteUpdate, db: AsyncSession = Depends
     return updated_note
 
 
-@method_logger
+@method_logger()
 @router.get("/current_day/list", response_model=List[CurrentDayNote])
 async def get_current_day_notes(db: AsyncSession = Depends(get_session)):
     """

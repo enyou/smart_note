@@ -66,7 +66,7 @@ def setup_logging(log_path, log_level):
                 'format': '%(asctime)s - %(name)s - %(levelname)s - [%(module)s:%(funcName)s:%(lineno)d] - %(message)s'
             },
             'access': {
-                'format': '%(asctime)s - %(client_addr)s - "%(request_line)s" %(status_code)s'
+                'format': '%(asctime)s -"%(request_line)s" %(status_code)s'
             }
         },
         'handlers': {

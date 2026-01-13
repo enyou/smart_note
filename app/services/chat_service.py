@@ -23,7 +23,7 @@ class AIResponse(BaseModel):
 class AIChatService:
 
     # 构建消息历史
-    @method_logger
+    @method_logger()
     async def build_messages(self, db: AsyncSession, session_id: str) -> list:
         logger.info("从数据库获取历史消息")
         db_conversations = await conversation_service.get_conversations_by_session(db, session_id)
@@ -36,7 +36,7 @@ class AIChatService:
 
         return messages
 
-    @method_logger
+    @method_logger()
     async def generate_stream_by_langchain(self, db: AsyncSession, user_msg: str, session_id: str, meta_data: str = None) -> AsyncGenerator[str, None]:
         messages = await self.build_messages(db, session_id)
         messages.append(HumanMessage(content=user_msg))
