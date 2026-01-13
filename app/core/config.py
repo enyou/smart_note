@@ -1,4 +1,5 @@
 import os
+from typing import List
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
@@ -37,7 +38,7 @@ class Settings(BaseSettings):
     log_path: str = get_env_value("LOG_PATH")
 
     # CORS setting
-    ALLOW_ORIGINS = ["*"]
+    ALLOW_ORIGINS: List[str] = ["*"]
 
     class Config:
         env_file = ".env"

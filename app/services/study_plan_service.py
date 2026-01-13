@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 class StudyPlanService:
 
-    @method_logger
+    @method_logger()
     async def create_study_plan_from_ai_response(
         self,
         db: AsyncSession,
@@ -87,7 +87,7 @@ class StudyPlanService:
             raise HTTPException(
                 status_code=400, detail=f"Error parsing AI response: {str(e)}")
 
-    @method_logger
+    @method_logger()
     async def get_user_study_plans(self, db: AsyncSession, user_id: int) -> List[StudyPlan]:
         """
         获取某用户下面的全部学习计划
@@ -104,7 +104,7 @@ class StudyPlanService:
         result = await db.execute(stm)
         return result.scalars().all()
 
-    @method_logger
+    @method_logger()
     async def get_study_plan(self, db: AsyncSession, plan_id: int) -> Optional[StudyPlan]:
         """
         获取学习计划
@@ -121,7 +121,7 @@ class StudyPlanService:
         result = await db.execute(stm)
         return result.scalars().one_or_none()
 
-    @method_logger
+    @method_logger()
     async def ge_study_plan_event_stream(self, state, graph, db, sessions, session_id, vector_store, chroma):
         """
         生成学习计划

@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 class NoteService:
 
-    @method_logger
+    @method_logger()
     async def get_note(self, db: AsyncSession, note_id: int) -> Optional[Note]:
         """
         获取note信息
@@ -42,7 +42,7 @@ class NoteService:
             note = result.scalars().one_or_none()
         return note
 
-    @method_logger
+    @method_logger()
     async def get_study_plan_notes(self, db: AsyncSession, study_plan_id: int) -> List[Note]:
         """
         获取某一学习计划下面的全部note
@@ -59,7 +59,7 @@ class NoteService:
         result = await db.execute(stm)
         return result.scalars().all()
 
-    @method_logger
+    @method_logger()
     async def update_note(self, db: AsyncSession, note_id: int, note_update: NoteUpdate) -> Optional[Note]:
         db_note = await self.get_note(db, note_id)
         if not db_note:
@@ -71,7 +71,7 @@ class NoteService:
         await db.refresh(db_note, ["updated_at"])
         return db_note
 
-    @method_logger
+    @method_logger()
     async def get_currend_day_notes(self, db: AsyncSession) -> List[Note]:
         """获取当天应该要学习的笔记"""
         cte = select(Note,
@@ -87,7 +87,7 @@ class NoteService:
         notes = result.scalars().all()
         return notes
 
-    @method_logger
+    @method_logger()
     async def generate_detailed_content(self, db: AsyncSession, note_id: int):
         """生成笔记的详细学习内容"""
         gen_success_flg = True
@@ -129,7 +129,7 @@ class NoteService:
                 result = await db.execute(stm)
                 yield CommonMessages.LLM_PROCESS_FINISH
 
-    @method_logger
+    @method_logger()
     def _get_knowledge_points(self, previous_notes: List[Note]):
         """获取之前每日学习的知识点
            从格式化的文本中提取每日学习要点
@@ -150,7 +150,7 @@ class NoteService:
                     knowledge_points.append(point)
         return knowledge_points
 
-    @method_logger
+    @method_logger()
     def _gen_system_prompt(self, previous_notes: List[Note], study_plan) -> str:
         """构建system提示词"""
         # 构建之前学习过的内容摘要
@@ -163,7 +163,7 @@ class NoteService:
                                                        previous_content=previous_content)
         return prompt
 
-    @method_logger
+    @method_logger()
     def _gen_user_prompt(self, current_note) -> str:
         """生成用户提示词"""
         knowledge_points = self._get_knowledge_points([current_note])

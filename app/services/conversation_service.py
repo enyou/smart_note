@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 class ConversationService:
 
-    @method_logger
+    @method_logger()
     async def create_conversation(self, db: AsyncSession, conversation: conversation.ConversationCreate):
         db_conversation = db_models.Conversation(
             session_id=conversation.session_id,
@@ -33,7 +33,7 @@ class ConversationService:
         await db.commit()
         return
 
-    @method_logger
+    @method_logger()
     async def get_conversations_by_session(self, db: AsyncSession, session_id: str, limit: int = 100):
         stmt = select(db_models.Conversation).where(db_models.Conversation.session_id ==
                                                     session_id).order_by(db_models.Conversation.created_at.desc()).limit(limit)

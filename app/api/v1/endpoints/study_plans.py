@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@method_logger
+@method_logger()
 @router.get("/user/{user_id}", response_model=List[StudyPlanResponse])
 async def get_user_study_plans(user_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -31,7 +31,7 @@ async def get_user_study_plans(user_id: int, db: AsyncSession = Depends(get_sess
     return await study_plan_service.get_user_study_plans(db, user_id)
 
 
-@method_logger
+@method_logger()
 @router.get("/{plan_id}", response_model=StudyPlanResponse)
 async def get_study_plan(plan_id: int, db: AsyncSession = Depends(get_session)):
     """
@@ -50,7 +50,7 @@ async def get_study_plan(plan_id: int, db: AsyncSession = Depends(get_session)):
     return study_plan
 
 
-@method_logger
+@method_logger()
 @router.post("/gen_plan_by_graph")
 async def gen_plan_by_graph(request: Request, session_id: str, text: str, db: AsyncSession = Depends(get_session)):
     """

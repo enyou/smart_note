@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@method_logger
+@method_logger()
 @router.post("/chat")
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_session)):
     """

@@ -31,9 +31,9 @@ async def lifespan(app: FastAPI):
 
     # 加载向量数据库
     logger.info("loading vector")
-    chroma = ChromaLangChainManager()
-    app.state.chroma = chroma
-    app.state.vector_store = chroma.load_existing_collection()
+    #chroma = ChromaLangChainManager()
+    #app.state.chroma = chroma
+    #app.state.vector_store = chroma.load_existing_collection()
 
     # 启动graph
     checkpointer = MemorySaver()
@@ -62,7 +62,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(LoggingMiddleware, exclude_paths=['/health', '/metrics'])
- 
+
 # 注册自定义异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
