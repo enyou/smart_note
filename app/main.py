@@ -31,9 +31,9 @@ async def lifespan(app: FastAPI):
 
     # 加载向量数据库
     logger.info("loading vector")
-    #chroma = ChromaLangChainManager()
-    #app.state.chroma = chroma
-    #app.state.vector_store = chroma.load_existing_collection()
+    chroma = ChromaLangChainManager()
+    app.state.chroma = chroma
+    app.state.vector_store = chroma.load_existing_collection()
 
     # 启动graph
     checkpointer = MemorySaver()
